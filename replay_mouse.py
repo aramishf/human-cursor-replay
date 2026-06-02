@@ -106,13 +106,22 @@ def get_active_window_bounds():
         output = proc.stdout.strip()
         parts = output.split(',')
         if len(parts) >= 5 and parts[4] != "unknown":
-            return {
-                "x": float(parts[0]),
-                "y": float(parts[1]),
-                "width": float(parts[2]),
-                "height": float(parts[3]),
-                "app": parts[4]
-            }
+            x = float(parts[0])
+            y = float(parts[1])
+            w = float(parts[2])
+            h = float(parts[3])
+            app_name = parts[4]
+            
+            # Exclude known background/system processes, menu bars (height < 30), or tiny windows (dialogs)
+            ignored_apps = ["System Events", "ControlCenter", "NotificationCenter", "loginwindow", "Dock", "Window Server", "Screen Sharing"]
+            if app_name not in ignored_apps and w > 200 and h > 200 and y > 23:
+                return {
+                    "x": x,
+                    "y": y,
+                    "width": w,
+                    "height": h,
+                    "app": app_name
+                }
     except Exception:
         pass
     return None
@@ -241,8 +250,12 @@ def replay_background_loop():
         ry = pt.get("ry")
         
         if win and rx is not None and ry is not None:
-            # Replay relative to the current active window offset
-            return win["x"] + rx, win["y"] + ry
+            tx = win["x"] + rx
+            ty = win["y"] + ry
+            # If the window relative coordinate is within valid screen bounds, use it.
+            # Otherwise, fall back to screen-normalized coordinates to prevent cursor jumps.
+            if 0 <= tx <= sw and 23 <= ty <= sh:
+                return tx, ty
         return fallback_x, fallback_y
 
     # Calculate starting point coordinates
