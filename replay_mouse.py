@@ -122,7 +122,8 @@ state = {
     "target_window": None,    # Start window boundaries
     "is_recording": False,
     "is_replaying": False,
-    "sample_rate": 20
+    "sample_rate": 20,
+    "replay_mode": "loop"     # "loop" or "once"
 }
 
 state_lock = threading.Lock()
@@ -218,6 +219,7 @@ def replay_background_loop():
     with state_lock:
         path = list(state["recorded_path"])
         target_window = state["target_window"]
+        replay_mode = state["replay_mode"]
         
     if not path:
         print("No movements to replay.")
@@ -300,6 +302,11 @@ def replay_background_loop():
             time.sleep(delay * variance_factor)
             
         loop_count += 1
+        if replay_mode == "once":
+            print("\n✓ Run Once playback complete.")
+            with state_lock:
+                state["is_replaying"] = False
+            break
 
 class MouseReplayerAPI(BaseHTTPRequestHandler):
     def end_headers(self):
@@ -367,8 +374,8 @@ class MouseReplayerAPI(BaseHTTPRequestHandler):
                 "count": len(path_data),
                 "path": path_data
             }).encode())
-            
         elif self.path == "/replay/start":
+            body = None
             content_length = int(self.headers.get('Content-Length', 0))
             if content_length > 0:
                 try:
@@ -400,6 +407,10 @@ class MouseReplayerAPI(BaseHTTPRequestHandler):
                 if state["is_recording"]:
                     state["is_recording"] = False
                 state["is_replaying"] = True
+                if content_length > 0 and "body" in locals() and isinstance(body, dict) and "mode" in body:
+                    state["replay_mode"] = body["mode"]
+                else:
+                    state["replay_mode"] = "loop"
                 
             thread = threading.Thread(target=replay_background_loop)
             thread.daemon = True

@@ -65,6 +65,11 @@ function App() {
   const [telemetryLog, setTelemetryLog] = useState([]);
   const [humanScore, setHumanScore] = useState(null);
   
+  // Replay Library & Playback Mode States
+  const [profileName, setProfileName] = useState('');
+  const [savedProfiles, setSavedProfiles] = useState([]);
+  const [replayMode, setReplayMode] = useState('loop'); // 'loop' | 'once'
+  
   // Video Recording State
   const [videoUrl, setVideoUrl] = useState(null);
   const [recordDuration, setRecordDuration] = useState(0);
@@ -125,6 +130,53 @@ function App() {
     const interval = setInterval(checkStatus, 1500);
     return () => clearInterval(interval);
   }, []);
+
+  // Load saved profiles from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('screenSync_profiles');
+    if (stored) {
+      try {
+        setSavedProfiles(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to parse saved profiles:", e);
+      }
+    }
+  }, []);
+
+  const saveProfile = () => {
+    if (!profileName.trim()) {
+      alert("Please enter a profile name.");
+      return;
+    }
+    const newProfile = {
+      id: Date.now().toString(),
+      name: profileName,
+      mouseLog: mouseLog,
+      telemetryLog: telemetryLog,
+      stats: stats,
+      duration: recordDuration
+    };
+    const updated = [...savedProfiles, newProfile];
+    setSavedProfiles(updated);
+    localStorage.setItem('screenSync_profiles', JSON.stringify(updated));
+    setProfileName('');
+    alert(`Profile "${profileName}" saved!`);
+  };
+
+  const deleteProfile = (id) => {
+    const updated = savedProfiles.filter(p => p.id !== id);
+    setSavedProfiles(updated);
+    localStorage.setItem('screenSync_profiles', JSON.stringify(updated));
+  };
+
+  const loadProfile = (profile) => {
+    setMouseLog(profile.mouseLog || []);
+    setTelemetryLog(profile.telemetryLog || []);
+    setStats(profile.stats || { distance: 0, clicks: 0, avgSpeed: 0, maxSpeed: 0 });
+    setRecordDuration(profile.duration || 0);
+    setStatus('recorded');
+    alert(`Profile "${profile.name}" loaded!`);
+  };
 
   // Clean up timer on unmount
   useEffect(() => {
@@ -315,7 +367,7 @@ function App() {
       await fetch(`${BACKEND_URL}/replay/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: rawPath })
+        body: JSON.stringify({ path: rawPath, mode: replayMode })
       });
       setIsReplayingGlobal(true);
     } catch (e) {
@@ -805,6 +857,30 @@ function App() {
               Turn this on to loop your recorded mouse path globally and stay active.
             </p>
 
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+              <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>Playback Mode:</span>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="replayMode" 
+                  value="loop" 
+                  checked={replayMode === 'loop'} 
+                  onChange={() => setReplayMode('loop')} 
+                />
+                Infinite Loop
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', cursor: 'pointer' }}>
+                <input 
+                  type="radio" 
+                  name="replayMode" 
+                  value="once" 
+                  checked={replayMode === 'once'} 
+                  onChange={() => setReplayMode('once')} 
+                />
+                Run Once
+              </label>
+            </div>
+
             <div style={{ display: 'flex', gap: '1rem' }}>
               {!isReplayingGlobal ? (
                 <button 
@@ -940,6 +1016,24 @@ function App() {
               Save your screen recording video and mouse coordinates as JSON.
             </p>
 
+            {status === 'recorded' && (
+              <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-muted)', marginBottom: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'var(--bg-secondary)', borderRadius: '6px' }}>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: '600' }}>Save to Library</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input 
+                    type="text" 
+                    placeholder="Profile Name" 
+                    value={profileName} 
+                    onChange={(e) => setProfileName(e.target.value)} 
+                    style={{ flex: 1, padding: '0.4rem 0.6rem', background: 'var(--bg-primary)', border: '1px solid var(--border-muted)', color: 'white', borderRadius: '6px', fontSize: '0.85rem' }}
+                  />
+                  <button onClick={saveProfile} className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem', borderRadius: '6px' }}>
+                    Save
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {status === 'recorded' ? (
                 <>
@@ -968,6 +1062,40 @@ function App() {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Saved Profiles Library Panel */}
+          <div className="glass-panel" style={{ padding: '1.5rem', background: 'var(--bg-secondary)' }}>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Layers size={20} style={{ color: 'var(--accent-cyan)' }} /> Saved Profiles ({savedProfiles.length})
+            </h3>
+            
+            {savedProfiles.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '1rem' }}>
+                No profiles saved yet.
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                {savedProfiles.map(p => (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: 'var(--bg-tertiary)', border: '1px solid var(--border-muted)', borderRadius: '6px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                       <span style={{ fontSize: '0.9rem', fontWeight: '600', color: 'white' }}>{p.name}</span>
+                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                         {p.duration?.toFixed(1)}s • {p.stats?.distance}px • {p.stats?.clicks} clicks
+                       </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button onClick={() => loadProfile(p)} className="btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px' }}>
+                        Load
+                      </button>
+                      <button onClick={() => deleteProfile(p.id)} className="btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', borderRadius: '4px', borderColor: 'rgba(218, 54, 51, 0.4)', color: 'var(--accent-pink)' }}>
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
         </section>
