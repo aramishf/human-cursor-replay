@@ -6,6 +6,7 @@ import threading
 import random
 import subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pynput import keyboard
 
 # Define CGPoint structure for macOS CoreGraphics
 class CGPoint(ctypes.Structure):
@@ -123,7 +124,7 @@ state = {
     "is_recording": False,
     "is_replaying": False,
     "sample_rate": 20,
-    "replay_mode": "loop"     # "loop" or "once"
+    "replay_mode": "loop"     # "loop" or "once"/"one-shot"
 }
 
 state_lock = threading.Lock()
@@ -302,8 +303,8 @@ def replay_background_loop():
             time.sleep(delay * variance_factor)
             
         loop_count += 1
-        if replay_mode == "once":
-            print("\n✓ Run Once playback complete.")
+        if replay_mode in ["once", "one-shot"]:
+            print(f"\n✓ {replay_mode.title()} playback complete.")
             with state_lock:
                 state["is_replaying"] = False
             break
@@ -407,7 +408,7 @@ class MouseReplayerAPI(BaseHTTPRequestHandler):
                 if state["is_recording"]:
                     state["is_recording"] = False
                 state["is_replaying"] = True
-                if content_length > 0 and "body" in locals() and isinstance(body, dict) and "mode" in body:
+                if content_length > 0 and body is not None and isinstance(body, dict) and "mode" in body:
                     state["replay_mode"] = body["mode"]
                 else:
                     state["replay_mode"] = "loop"
@@ -434,7 +435,44 @@ class MouseReplayerAPI(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+def on_start_replay():
+    print("Hotkey triggered: Cmd+Opt+R (Start Replay)")
+    global state
+    with state_lock:
+        if state["is_recording"]:
+            state["is_recording"] = False
+        if not state["is_replaying"] and state["recorded_path"]:
+            state["is_replaying"] = True
+            thread = threading.Thread(target=replay_background_loop)
+            thread.daemon = True
+            thread.start()
+            print("✓ Playback started via hotkey.")
+        elif not state["recorded_path"]:
+            print("⚠ Hotkey warning: No recorded pathway loaded to replay.")
+
+def on_stop_all():
+    print("Hotkey triggered: Cmd+Opt+S (Stop Recording/Replay)")
+    global state
+    with state_lock:
+        state["is_recording"] = False
+        state["is_replaying"] = False
+    print("✓ Stopped all tasks via hotkey.")
+
+def start_hotkey_listener():
+    try:
+        hotkeys = keyboard.GlobalHotKeys({
+            '<cmd>+<alt>+r': on_start_replay,
+            '<cmd>+<alt>+s': on_stop_all
+        })
+        thread = threading.Thread(target=hotkeys.run)
+        thread.daemon = True
+        thread.start()
+        print("✓ Global Hotkey Listener active: Cmd+Opt+R (Start), Cmd+Opt+S (Stop)")
+    except Exception as e:
+        print(f"Error starting global hotkey listener: {e}")
+
 def run_server(port=8000):
+    start_hotkey_listener()
     server_address = ('', port)
     httpd = HTTPServer(server_address, MouseReplayerAPI)
     print(f"\n=======================================================")
