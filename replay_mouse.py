@@ -3,6 +3,7 @@ import time
 import sys
 import json
 import threading
+import random
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Define CGPoint structure for macOS CoreGraphics
@@ -99,6 +100,42 @@ def record_background_loop():
         state["is_recording"] = False
     print(f"✓ Recording finished! Captured {len(path)} positions.")
 
+def generate_bezier_path(start, end, steps=30):
+    """Generate a smooth cubic Bezier curve between two points with randomized natural curvature."""
+    x0, y0 = start
+    x3, y3 = end
+    
+    dx = x3 - x0
+    dy = y3 - y0
+    distance = (dx**2 + dy**2)**0.5
+    if distance < 10:
+        return [end]
+        
+    # Generate deviation perpendicular to the path to simulate human-like arcs
+    deviation = distance * random.uniform(0.12, 0.22)
+    
+    # Calculate perpendicular vector
+    px = -dy / distance if distance > 0 else 0
+    py = dx / distance if distance > 0 else 0
+    
+    # Randomly curve left or right
+    direction = random.choice([-1, 1])
+    
+    # Create displaced control points
+    x1 = x0 + dx * 0.33 + px * deviation * direction + random.gauss(0, 3)
+    y1 = y0 + dy * 0.33 + py * deviation * direction + random.gauss(0, 3)
+    x2 = x0 + dx * 0.66 + px * deviation * direction + random.gauss(0, 3)
+    y2 = y0 + dy * 0.66 + py * deviation * direction + random.gauss(0, 3)
+    
+    path = []
+    for i in range(steps):
+        t = i / (steps - 1)
+        # Cubic Bezier formula
+        xt = (1-t)**3 * x0 + 3*(1-t)**2 * t * x1 + 3*(1-t) * t**2 * x2 + t**3 * x3
+        yt = (1-t)**3 * y0 + 3*(1-t)**2 * t * y1 + 3*(1-t) * t**2 * y2 + t**3 * y3
+        path.append((xt, yt))
+    return path
+
 def replay_background_loop():
     global state
     delay = 1.0 / state["sample_rate"]
@@ -114,6 +151,28 @@ def replay_background_loop():
         
     print("\n>>> Playback Replay Loop Started...")
     
+    # 1. Slide smoothly from current physical cursor position to the starting point of the path
+    current_pos = get_mouse_position()
+    start_pt = path[0]
+    glide_steps = 25
+    
+    print(f"Gliding cursor smoothly to start position {start_pt}...")
+    glide_path = generate_bezier_path(current_pos, start_pt, steps=glide_steps)
+    
+    for pos in glide_path:
+        with state_lock:
+            if not state["is_replaying"]:
+                return
+        if is_kill_switch_pressed():
+            print("\n🛑 Stopped: Kill switch detected during glide. Exiting replayer.")
+            with state_lock:
+                state["is_replaying"] = False
+            return
+        move_mouse(pos[0], pos[1])
+        # Smooth glide pacing with tiny variation
+        time.sleep(delay * random.uniform(0.8, 1.2))
+        
+    print("Replaying path...")
     while True:
         for pos in path:
             with state_lock:
@@ -127,8 +186,19 @@ def replay_background_loop():
                     state["is_replaying"] = False
                 return
                 
-            move_mouse(pos[0], pos[1])
-            time.sleep(delay)
+            # 2. Mathematical Jitter: add tiny Gaussian noise (1-2 px micro-tremor)
+            jitter_x = random.gauss(0, 0.6)
+            jitter_y = random.gauss(0, 0.6)
+            target_x = pos[0] + jitter_x
+            target_y = pos[1] + jitter_y
+            
+            move_mouse(target_x, target_y)
+            
+            # 3. Timing Variance: slight randomized sleep intervals
+            variance_factor = random.gauss(1.0, 0.08)
+            # Clamp variance to prevent extreme freezes or fast jumps
+            variance_factor = max(0.6, min(1.4, variance_factor))
+            time.sleep(delay * variance_factor)
 
 class MouseReplayerAPI(BaseHTTPRequestHandler):
     def end_headers(self):
