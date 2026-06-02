@@ -413,11 +413,8 @@ function App() {
           ctx.lineCap = 'round';
           ctx.lineJoin = 'round';
 
-          // Color gradient for active movement
-          const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-          grad.addColorStop(0, '#9d4edd');
-          grad.addColorStop(1, '#00f5d4');
-          ctx.strokeStyle = grad;
+          // Solid color trace for active movement
+          ctx.strokeStyle = 'var(--accent-cyan)';
 
           // Normalize path coordinate display relative to canvas size
           const screenWidth = window.screen.width || 1920;
@@ -441,10 +438,9 @@ function App() {
           const lastPoint = getCanvasCoords(currentLogs[currentLogs.length - 1]);
           ctx.beginPath();
           ctx.arc(lastPoint.x, lastPoint.y, 6, 0, 2 * Math.PI);
-          ctx.fillStyle = '#00f5d4';
+          ctx.fillStyle = 'var(--accent-cyan)';
           ctx.fill();
-          ctx.shadowBlur = 10;
-          ctx.shadowColor = '#00f5d4';
+          ctx.shadowBlur = 0;
         }
       } else if (activeTab === 'heatmap') {
         const screenWidth = window.screen.width || 1920;
@@ -458,7 +454,7 @@ function App() {
             cx, cy, 1, 
             cx, cy, 15
           );
-          radialGrad.addColorStop(0, 'rgba(0, 245, 212, 0.15)');
+          radialGrad.addColorStop(0, 'rgba(88, 166, 255, 0.25)');
           radialGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
           
           ctx.fillStyle = radialGrad;
@@ -520,12 +516,12 @@ function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', flex: 1, paddingBottom: '3rem' }}>
       {/* Header section */}
-      <header className="glass-panel" style={{ padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <header className="glass-panel" style={{ padding: '1.25rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: 'var(--bg-secondary)', borderRadius: '6px' }}>
         <div>
-          <h1 style={{ fontSize: '2.5rem', fontWeight: '800', margin: '0', display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'linear-gradient(to right, #9d4edd, #00f5d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            <Activity size={36} style={{ stroke: '#9d4edd' }} /> ScreenSync
+          <h1 style={{ fontSize: '2rem', fontWeight: '700', margin: '0', display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'white' }}>
+            <Activity size={28} style={{ stroke: 'var(--accent-cyan)' }} /> ScreenSync
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.25rem' }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '0.25rem' }}>
             Record your screen and track mouse movements.
           </p>
         </div>
@@ -535,28 +531,28 @@ function App() {
             display: 'flex', 
             alignItems: 'center', 
             gap: '0.5rem', 
-            background: backendConnected ? 'rgba(0, 245, 212, 0.1)' : 'rgba(255, 0, 127, 0.1)', 
-            padding: '0.5rem 1rem', 
-            borderRadius: '30px', 
-            border: backendConnected ? '1px solid rgba(0, 245, 212, 0.3)' : '1px solid rgba(255, 0, 127, 0.3)'
+            background: backendConnected ? 'rgba(35, 134, 54, 0.15)' : 'rgba(218, 54, 51, 0.15)', 
+            padding: '0.35rem 0.75rem', 
+            borderRadius: '6px', 
+            border: backendConnected ? '1px solid rgba(46, 160, 67, 0.3)' : '1px solid rgba(248, 81, 73, 0.3)'
           }}>
-            {backendConnected ? <Link size={16} style={{ color: 'var(--accent-cyan)' }} /> : <Link2Off size={16} style={{ color: 'var(--accent-pink)' }} />}
-            <span style={{ fontSize: '0.85rem', fontWeight: '700', color: backendConnected ? 'var(--accent-cyan)' : 'var(--accent-pink)' }}>
+            {backendConnected ? <Link size={14} style={{ color: 'var(--accent-cyan)' }} /> : <Link2Off size={14} style={{ color: 'var(--accent-pink)' }} />}
+            <span style={{ fontSize: '0.8rem', fontWeight: '600', color: backendConnected ? 'var(--accent-cyan)' : 'var(--accent-pink)' }}>
               {backendConnected ? "Native Helper Online" : "Native Helper Offline"}
             </span>
           </div>
 
           {status === 'recording' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255, 0, 127, 0.1)', padding: '0.5rem 1rem', borderRadius: '30px', border: '1px solid rgba(255, 0, 127, 0.3)' }}>
-              <span className="record-pulse" style={{ width: '10px', height: '10px', backgroundColor: 'var(--accent-pink)', borderRadius: '50%', display: 'inline-block' }}></span>
-              <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--accent-pink)', fontFamily: 'var(--font-mono)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(218, 54, 51, 0.15)', padding: '0.35rem 0.75rem', borderRadius: '6px', border: '1px solid rgba(248, 81, 73, 0.3)' }}>
+              <span className="record-pulse" style={{ width: '8px', height: '8px', backgroundColor: 'var(--accent-pink)', borderRadius: '50%', display: 'inline-block' }}></span>
+              <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--accent-pink)', fontFamily: 'var(--font-mono)' }}>
                 {recordDuration.toFixed(1)}s
               </span>
             </div>
           )}
           {status === 'recorded' && (
-            <button className="btn-secondary" onClick={() => { setStatus('idle'); setVideoUrl(null); setMouseLog([]); setTelemetryLog([]); setHumanScore(null); }} style={{ padding: '0.6rem 1.2rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <RefreshCw size={16} /> Reset Tracker
+            <button className="btn-secondary" onClick={() => { setStatus('idle'); setVideoUrl(null); setMouseLog([]); setTelemetryLog([]); setHumanScore(null); }} style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <RefreshCw size={14} /> Reset Tracker
             </button>
           )}
         </div>
@@ -571,7 +567,7 @@ function App() {
             <div className="glass-panel" style={{ overflow: 'hidden' }}>
               <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Video size={20} style={{ color: 'var(--accent-purple)' }} />
+                  <Video size={18} style={{ color: 'var(--accent-cyan)' }} />
                   <span style={{ fontWeight: '600' }}>Active Movement Recording Window</span>
                 </div>
                 
@@ -605,12 +601,12 @@ function App() {
                 </div>
 
                 {!isRecording ? (
-                  <button className="btn-primary" onClick={startRecording} style={{ padding: '0.5rem 1.2rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Play size={16} /> Share Screen & Start
+                  <button className="btn-primary" onClick={startRecording} style={{ padding: '0.5rem 1rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Play size={14} /> Share Screen & Start
                   </button>
                 ) : (
-                  <button className="btn-danger" onClick={stopRecording} style={{ padding: '0.5rem 1.2rem', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <Square size={16} /> Done (Stop Recording)
+                  <button className="btn-danger" onClick={stopRecording} style={{ padding: '0.5rem 1rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Square size={14} /> Done (Stop Recording)
                   </button>
                 )}
               </div>
@@ -632,8 +628,8 @@ function App() {
               >
                 {!isRecording ? (
                   <div style={{ textAlign: 'center', maxWidth: '380px' }}>
-                    <div style={{ width: '64px', height: '64px', borderRadius: '50%', backgroundColor: 'rgba(157, 78, 221, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
-                      <MousePointer size={32} style={{ color: 'var(--accent-purple)' }} />
+                    <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'rgba(88, 166, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+                      <MousePointer size={24} style={{ color: 'var(--accent-cyan)' }} />
                     </div>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: '700', marginBottom: '0.5rem' }}>Ready to Record</h3>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', lineHeight: '1.5' }}>
@@ -643,7 +639,7 @@ function App() {
                 ) : (
                   <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)', background: 'rgba(0, 245, 212, 0.1)', padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(0, 245, 212, 0.2)' }}>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)', background: 'rgba(88, 166, 255, 0.1)', padding: '0.25rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(88, 166, 255, 0.2)' }}>
                         Tracking Active System Mouse...
                       </span>
                     </div>
@@ -679,7 +675,7 @@ function App() {
                       borderRadius: '6px', 
                       fontSize: '0.85rem', 
                       border: 'none', 
-                      background: activeTab === 'path' ? 'var(--accent-purple)' : 'transparent',
+                      background: activeTab === 'path' ? 'var(--accent-blue)' : 'transparent',
                       color: 'white',
                       cursor: 'pointer',
                       display: 'flex',
@@ -696,7 +692,7 @@ function App() {
                       borderRadius: '6px', 
                       fontSize: '0.85rem', 
                       border: 'none', 
-                      background: activeTab === 'heatmap' ? 'var(--accent-purple)' : 'transparent',
+                      background: activeTab === 'heatmap' ? 'var(--accent-blue)' : 'transparent',
                       color: 'white',
                       cursor: 'pointer',
                       display: 'flex',
@@ -713,7 +709,7 @@ function App() {
                       borderRadius: '6px', 
                       fontSize: '0.85rem', 
                       border: 'none', 
-                      background: activeTab === 'analytics' ? 'var(--accent-purple)' : 'transparent',
+                      background: activeTab === 'analytics' ? 'var(--accent-blue)' : 'transparent',
                       color: 'white',
                       cursor: 'pointer',
                       display: 'flex',
@@ -800,7 +796,7 @@ function App() {
         <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           
           {/* Global Simulation Control Panel */}
-          <div className="glass-panel" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, rgba(157, 78, 221, 0.15) 0%, rgba(0, 245, 212, 0.05) 100%)' }}>
+          <div className="glass-panel" style={{ padding: '1.5rem', background: 'var(--bg-secondary)' }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Power size={20} style={{ color: 'var(--accent-cyan)' }} /> Mouse Replayer
             </h3>
@@ -815,7 +811,7 @@ function App() {
                   onClick={startGlobalReplay} 
                   disabled={mouseLog.length === 0 || !backendConnected}
                   className="btn-primary" 
-                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  style={{ flex: 1, padding: '0.75rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 >
                   <Play size={18} /> Start Replay
                 </button>
@@ -823,7 +819,7 @@ function App() {
                 <button 
                   onClick={stopGlobalReplay} 
                   className="btn-danger" 
-                  style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                  style={{ flex: 1, padding: '0.75rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
                 >
                   <Square size={18} /> Done (Stop Replay)
                 </button>
@@ -832,7 +828,7 @@ function App() {
               <button 
                 onClick={stopGlobalReplay} 
                 className="btn-secondary" 
-                style={{ padding: '0.75rem 1.2rem', borderRadius: '8px', border: '1px solid var(--glass-border)' }}
+                style={{ padding: '0.75rem 1.2rem', borderRadius: '6px' }}
               >
                 Exit Replay
               </button>
@@ -847,13 +843,13 @@ function App() {
 
           {/* Main Performance / Movement Metrics */}
           <div className="glass-panel" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Award size={20} style={{ color: 'var(--accent-purple)' }} /> Activity Dashboard
+            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
+              <Award size={20} style={{ color: 'var(--accent-cyan)' }} /> Activity Dashboard
             </h3>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               {/* Metric 1 */}
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-glow)' }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-muted)' }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <MousePointer size={14} /> Total Distance
                 </div>
@@ -863,7 +859,7 @@ function App() {
               </div>
 
               {/* Metric 2 */}
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-glow)' }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-muted)' }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <MousePointerClick size={14} /> Action Clicks
                 </div>
@@ -873,7 +869,7 @@ function App() {
               </div>
 
               {/* Metric 3 */}
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-glow)' }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-muted)' }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <TrendingUp size={14} /> Average Velocity
                 </div>
@@ -883,7 +879,7 @@ function App() {
               </div>
 
               {/* Metric 4 */}
-              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border-glow)' }}>
+              <div style={{ background: 'var(--bg-secondary)', padding: '1rem', borderRadius: '6px', border: '1px solid var(--border-muted)' }}>
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   <Sparkles size={14} /> Peak Velocity
                 </div>
@@ -895,7 +891,7 @@ function App() {
 
             {/* Human-Likeness Score Section */}
             {humanScore !== null && (
-              <div style={{ marginTop: '1rem', background: 'linear-gradient(135deg, rgba(0, 245, 212, 0.1) 0%, rgba(157, 78, 221, 0.1) 100%)', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid var(--border-glow)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ marginTop: '1rem', background: 'var(--bg-tertiary)', padding: '1rem 1.25rem', borderRadius: '8px', border: '1px solid var(--border-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                     <Activity size={14} style={{ color: 'var(--accent-cyan)' }} /> Human-Likeness Score
@@ -926,7 +922,7 @@ function App() {
                       <XAxis dataKey="time" stroke="var(--text-dark)" fontSize={10} tickLine={false} />
                       <YAxis stroke="var(--text-dark)" fontSize={10} tickLine={false} />
                       <Tooltip 
-                        contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'white' }}
+                        contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-muted)', borderRadius: '6px', color: 'white' }}
                         labelFormatter={(label) => `${label}s`}
                       />
                       <Area type="monotone" dataKey="velocity" stroke="var(--accent-cyan)" strokeWidth={2} fillOpacity={1} fill="url(#velocityGrad)" />
@@ -950,7 +946,7 @@ function App() {
                   <button 
                     onClick={downloadJSON}
                     className="btn-primary" 
-                    style={{ padding: '0.75rem 1rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%' }}
+                    style={{ padding: '0.75rem 1rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', width: '100%' }}
                   >
                     <Download size={18} /> Export Coordinate Dataset (.json)
                   </button>
@@ -959,7 +955,7 @@ function App() {
                     href={videoUrl} 
                     download={`screen-recording-${Date.now()}.webm`}
                     className="btn-secondary"
-                    style={{ padding: '0.75rem 1rem', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', textDecoration: 'none', fontSize: '0.9rem' }}
+                    style={{ padding: '0.75rem 1rem', borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', textDecoration: 'none', fontSize: '0.9rem' }}
                   >
                     <Download size={18} /> Download Video Capture (.webm)
                   </a>
