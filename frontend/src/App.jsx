@@ -171,10 +171,14 @@ function App() {
           const res = await fetch(`${BACKEND_URL}/record/stop`, { method: 'POST' });
           if (res.ok) {
             const data = await res.json();
-            // Transform python [x, y] format into log format
-            const pathData = (data.path || []).map((pos, idx) => ({
-              x: pos[0],
-              y: pos[1],
+            // Transform python coordinate maps into log format
+            const pathData = (data.path || []).map((pt, idx) => ({
+              nx: pt.nx,
+              ny: pt.ny,
+              rx: pt.rx,
+              ry: pt.ry,
+              x: pt.nx * (window.screen.width || 1920),
+              y: pt.ny * (window.screen.height || 1080),
               time: idx * (1000 / 20),
               type: 'move'
             }));
@@ -196,8 +200,13 @@ function App() {
       alert("Python backend is not connected.");
       return;
     }
-    // Extract raw positions back to python expected format [[x,y],...]
-    const rawPath = mouseLog.map(p => [p.x, p.y]);
+    // Extract full coordinate maps
+    const rawPath = mouseLog.map(p => ({
+      nx: p.nx,
+      ny: p.ny,
+      rx: p.rx,
+      ry: p.ry
+    }));
     try {
       await fetch(`${BACKEND_URL}/replay/start`, {
         method: 'POST',
