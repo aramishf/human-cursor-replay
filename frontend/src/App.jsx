@@ -18,14 +18,52 @@ import {
   Link2Off,
   Power
 } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 
 const BACKEND_URL = 'http://localhost:8000';
+
+const calculateHumanLikenessScore = (telemetry) => {
+  if (!telemetry || telemetry.length < 5) return 0;
+  const velocities = telemetry.map(t => t.velocity);
+  const n = velocities.length;
+  const mean = velocities.reduce((a, b) => a + b, 0) / n;
+  if (mean === 0) return 0;
+  
+  const variance = velocities.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / n;
+  const stdDev = Math.sqrt(variance);
+  const cv = stdDev / mean;
+  
+  let score = 95;
+  
+  if (cv < 0.1) {
+    score -= 80 * (1 - (cv / 0.1));
+  } else if (cv < 0.25) {
+    score -= 30 * (1 - ((cv - 0.1) / 0.15));
+  }
+  
+  let abruptChanges = 0;
+  for (let i = 1; i < telemetry.length; i++) {
+    const dv = Math.abs(telemetry[i].velocity - telemetry[i - 1].velocity);
+    if (dv > mean * 1.5) {
+      abruptChanges++;
+    }
+  }
+  
+  const abruptRatio = abruptChanges / (n - 1);
+  if (abruptRatio > 0.1) {
+    score -= Math.min(40, abruptRatio * 150);
+  }
+  
+  return Math.max(5, Math.min(100, Math.round(score)));
+};
 
 function App() {
   // App States
   const [isRecording, setIsRecording] = useState(false);
   const [status, setStatus] = useState('idle'); // 'idle' | 'recording' | 'recorded'
   const [activeTab, setActiveTab] = useState('analytics'); // 'analytics' | 'heatmap' | 'path'
+  const [telemetryLog, setTelemetryLog] = useState([]);
+  const [humanScore, setHumanScore] = useState(null);
   
   // Video Recording State
   const [videoUrl, setVideoUrl] = useState(null);
@@ -57,6 +95,9 @@ function App() {
   const videoPlayerRef = useRef(null);
   const canvasRef = useRef(null);
   const timerIntervalRef = useRef(null);
+  const mousePosRef = useRef(null);
+  const lastMousePosRef = useRef(null);
+  const telemetryIntervalRef = useRef(null);
   
   // Track start time to calculate relative timestamp
   const startTimeRef = useRef(null);
@@ -113,11 +154,47 @@ function App() {
     }
   }, [isRecording, useTimer, targetDuration]);
 
+  // Telemetry collection loop during recording
+  useEffect(() => {
+    if (isRecording) {
+      setTelemetryLog([]);
+      setHumanScore(null);
+      mousePosRef.current = null;
+      lastMousePosRef.current = null;
+
+      const handleMouseMove = (e) => {
+        mousePosRef.current = { x: e.clientX, y: e.clientY };
+      };
+      window.addEventListener('mousemove', handleMouseMove);
+
+      const recordStartTime = Date.now();
+      telemetryIntervalRef.current = setInterval(() => {
+        const elapsed = (Date.now() - recordStartTime) / 1000;
+        let velocity = 0;
+        if (mousePosRef.current && lastMousePosRef.current) {
+          const dx = mousePosRef.current.x - lastMousePosRef.current.x;
+          const dy = mousePosRef.current.y - lastMousePosRef.current.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          velocity = dist / 0.1; // px per second
+        }
+        setTelemetryLog(prev => [...prev, { time: Math.round(elapsed * 10) / 10, velocity: Math.round(velocity) }]);
+        lastMousePosRef.current = mousePosRef.current;
+      }, 100);
+
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        if (telemetryIntervalRef.current) clearInterval(telemetryIntervalRef.current);
+      };
+    }
+  }, [isRecording]);
+
   // Start Screen Recording & Mouse Tracking
   const startRecording = async () => {
     try {
       recordedChunksRef.current = [];
       setMouseLog([]);
+      setTelemetryLog([]);
+      setHumanScore(null);
       setRecordDuration(0);
       setStats({ distance: 0, clicks: 0, avgSpeed: 0, maxSpeed: 0 });
       lastPosRef.current = null;
@@ -186,10 +263,37 @@ function App() {
             
             // Calculate mock velocity/stats for display based on the path
             calculateStatsFromPath(pathData);
+
+            // Build telemetry from global path data (sampled at 100ms, i.e., every 2 points since recording is 20Hz)
+            const backendTelemetry = [];
+            for (let i = 2; i < pathData.length; i += 2) {
+              const p1 = pathData[i - 2];
+              const p2 = pathData[i];
+              const dt = (p2.time - p1.time) / 1000;
+              if (dt > 0) {
+                const dx = p2.x - p1.x;
+                const dy = p2.y - p1.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const velocity = dist / dt;
+                backendTelemetry.push({
+                  time: Math.round((p2.time / 1000) * 10) / 10,
+                  velocity: Math.round(velocity)
+                });
+              }
+            }
+            if (backendTelemetry.length > 0) {
+              setTelemetryLog(backendTelemetry);
+              setHumanScore(calculateHumanLikenessScore(backendTelemetry));
+            } else {
+              setHumanScore(calculateHumanLikenessScore(telemetryLog));
+            }
           }
         } catch (e) {
           console.error("Failed to stop backend recording:", e);
+          setHumanScore(calculateHumanLikenessScore(telemetryLog));
         }
+      } else {
+        setHumanScore(calculateHumanLikenessScore(telemetryLog));
       }
     }
   };
@@ -419,10 +523,10 @@ function App() {
       <header className="glass-panel" style={{ padding: '1.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h1 style={{ fontSize: '2.5rem', fontWeight: '800', margin: '0', display: 'flex', alignItems: 'center', gap: '0.75rem', background: 'linear-gradient(to right, #9d4edd, #00f5d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            <Activity size={36} style={{ stroke: '#9d4edd' }} /> ScreenSync Analytics
+            <Activity size={36} style={{ stroke: '#9d4edd' }} /> ScreenSync
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.25rem' }}>
-            Record screen activity and monitor active mouse dynamics in real-time
+            Record your screen and track mouse movements.
           </p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
@@ -451,7 +555,7 @@ function App() {
             </div>
           )}
           {status === 'recorded' && (
-            <button className="btn-secondary" onClick={() => { setStatus('idle'); setVideoUrl(null); setMouseLog([]); }} style={{ padding: '0.6rem 1.2rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button className="btn-secondary" onClick={() => { setStatus('idle'); setVideoUrl(null); setMouseLog([]); setTelemetryLog([]); setHumanScore(null); }} style={{ padding: '0.6rem 1.2rem', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <RefreshCw size={16} /> Reset Tracker
             </button>
           )}
@@ -698,11 +802,11 @@ function App() {
           {/* Global Simulation Control Panel */}
           <div className="glass-panel" style={{ padding: '1.5rem', background: 'linear-gradient(135deg, rgba(157, 78, 221, 0.15) 0%, rgba(0, 245, 212, 0.05) 100%)' }}>
             <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Power size={20} style={{ color: 'var(--accent-cyan)' }} /> Active Simulation Controls
+              <Power size={20} style={{ color: 'var(--accent-cyan)' }} /> Mouse Replayer
             </h3>
             
             <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '1.25rem' }}>
-              Once you have recorded a mouse pathway, activate it globally. Your mouse will repeat your movement patterns to keep your status active online.
+              Turn this on to loop your recorded mouse path globally and stay active.
             </p>
 
             <div style={{ display: 'flex', gap: '1rem' }}>
@@ -788,13 +892,56 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Human-Likeness Score Section */}
+            {humanScore !== null && (
+              <div style={{ marginTop: '1rem', background: 'linear-gradient(135deg, rgba(0, 245, 212, 0.1) 0%, rgba(157, 78, 221, 0.1) 100%)', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid var(--border-glow)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                    <Activity size={14} style={{ color: 'var(--accent-cyan)' }} /> Human-Likeness Score
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-dark)', marginTop: '0.25rem' }}>
+                    {humanScore > 70 ? "Natural variation detected." : "High uniformity detected (robotic)."}
+                  </div>
+                </div>
+                <div style={{ fontSize: '2rem', fontWeight: '900', color: humanScore > 70 ? 'var(--accent-cyan)' : 'var(--accent-pink)', fontFamily: 'var(--font-mono)' }}>
+                  {humanScore}%
+                </div>
+              </div>
+            )}
+
+            {/* Velocity Profile Area Chart */}
+            {telemetryLog.length > 0 && (
+              <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--glass-border)' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: '700', marginBottom: '1rem', color: 'var(--text-muted)' }}>Velocity Profile (px/s)</h4>
+                <div style={{ width: '100%', height: 160 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={telemetryLog} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="velocityGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="var(--accent-cyan)" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="var(--accent-cyan)" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="time" stroke="var(--text-dark)" fontSize={10} tickLine={false} />
+                      <YAxis stroke="var(--text-dark)" fontSize={10} tickLine={false} />
+                      <Tooltip 
+                        contentStyle={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', borderRadius: '8px', color: 'white' }}
+                        labelFormatter={(label) => `${label}s`}
+                      />
+                      <Area type="monotone" dataKey="velocity" stroke="var(--accent-cyan)" strokeWidth={2} fillOpacity={1} fill="url(#velocityGrad)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Export / Data logs */}
           <div className="glass-panel" style={{ padding: '1.5rem' }}>
-            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem' }}>Data Management</h3>
+            <h3 style={{ fontSize: '1.2rem', fontWeight: '700', marginBottom: '1rem' }}>Downloads</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: '1.4', marginBottom: '1.25rem' }}>
-              Export recorded video files alongside precise mouse activity datasets to analyze movement patterns in external toolkits.
+              Save your screen recording video and mouse coordinates as JSON.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -820,7 +967,7 @@ function App() {
               ) : (
                 <div style={{ padding: '1.5rem', background: 'var(--bg-secondary)', borderRadius: '10px', textAlign: 'center', border: '1px dashed var(--glass-border)' }}>
                   <span style={{ fontSize: '0.85rem', color: 'var(--text-dark)' }}>
-                    No dataset recorded yet. Start tracking to generate export files.
+                    No data to export yet. Record a session to get started.
                   </span>
                 </div>
               )}
@@ -831,9 +978,8 @@ function App() {
       </div>
 
       {/* Footer */}
-      <footer style={{ marginTop: 'auto', paddingTop: '2rem', borderTop: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: 'var(--text-dark)', fontSize: '0.85rem' }}>
-        <span>ScreenSync Tracker • Modern Movement Analytics Suite</span>
-        <span>Aramish's Development Space</span>
+      <footer style={{ marginTop: 'auto', paddingTop: '2rem', borderTop: '1px solid var(--glass-border)', display: 'flex', justifyContent: 'center', alignItems: 'center', color: 'var(--text-dark)', fontSize: '0.85rem' }}>
+        <span>ScreenSync Tracker by Aramish</span>
       </footer>
     </div>
   );
