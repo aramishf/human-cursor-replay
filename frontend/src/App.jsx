@@ -276,8 +276,11 @@ function App() {
               ry: pt.ry,
               x: pt.nx * (window.screen.width || 1920),
               y: pt.ny * (window.screen.height || 1080),
-              time: idx * (1000 / 20),
-              type: 'move'
+              time: pt.time !== undefined ? pt.time * 1000 : idx * (1000 / 20),
+              type: pt.type || 'move',
+              button: pt.button,
+              pressed: pt.pressed,
+              key: pt.key
             }));
             setMouseLog(pathData);
             
@@ -322,10 +325,15 @@ function App() {
       return;
     }
     const rawPath = mouseLog.map(p => ({
+      type: p.type || 'move',
+      time: p.time !== undefined ? p.time / 1000 : 0.0,
       nx: p.nx,
       ny: p.ny,
       rx: p.rx,
-      ry: p.ry
+      ry: p.ry,
+      button: p.button,
+      pressed: p.pressed,
+      key: p.key
     }));
     try {
       await fetch(`${BACKEND_URL}/replay/start`, {
@@ -350,18 +358,17 @@ function App() {
   };
 
   const calculateStatsFromPath = (path) => {
-    if (path.length < 2) return;
+    const mouseEvents = path.filter(p => p.type === 'move' || p.type === 'click');
+    let clickCount = path.filter(p => p.type === 'click' && p.pressed).length;
     let totalDist = 0;
-    let clickCount = 0;
     let maxSpeed = 0;
     let speeds = [];
 
-    for (let i = 1; i < path.length; i++) {
-      const p1 = path[i - 1];
-      const p2 = path[i];
-      if (p2.type === 'click') clickCount++;
-      const dx = p2.x - p1.x;
-      const dy = p2.y - p1.y;
+    for (let i = 1; i < mouseEvents.length; i++) {
+      const p1 = mouseEvents[i - 1];
+      const p2 = mouseEvents[i];
+      const dx = (p2.x || 0) - (p1.x || 0);
+      const dy = (p2.y || 0) - (p1.y || 0);
       const dist = Math.sqrt(dx * dx + dy * dy);
       totalDist += dist;
 
